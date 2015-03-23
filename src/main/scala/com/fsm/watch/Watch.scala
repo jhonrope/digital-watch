@@ -16,7 +16,7 @@ object WatchApp extends App {
 
   val system = ActorSystem("watch")
 
-  val watch = system.actorOf(PersistentWatch.props(), "persistent-actor-1")
+  val watch = system.actorOf(PersistentWatch.props("persistent-actor-1"), "persistent-actor-1")
   val duration = FiniteDuration(1, "second")
   implicit val ec = system.dispatcher
   implicit val timeout = Timeout(1000, MILLISECONDS)

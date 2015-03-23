@@ -3,13 +3,11 @@ package com.fsm.watch
 import akka.actor._
 import akka.persistence.PersistentActor
 
-import scala.collection.immutable.HashMap
-
 case class PersistentWatchInfo(watchState: WatchState, watch: Watch)
 
-class PersistentWatch(initialWatchState: WatchState, initialWatch: Watch = DefaultWatch()) extends PersistentActor with WatchStateReceives with ActorLogging {
+class PersistentWatch(id: String, initialWatchState: WatchState, initialWatch: Watch = DefaultWatch()) extends PersistentActor with WatchStateReceives with ActorLogging {
 
-  override def persistenceId: String = "persistent-watch-1"
+  override def persistenceId: String = id
 
   val info = PersistentWatchInfo(initialWatchState, initialWatch)
 
@@ -20,14 +18,9 @@ class PersistentWatch(initialWatchState: WatchState, initialWatch: Watch = Defau
   override def receiveCommand: Receive = definedWatchStates(initialWatchState)(info)
 }
 
-
-
-
-
-
 object PersistentWatch {
 
-  def props(): Props = Props(new PersistentWatch(Default, DefaultWatch()))
+  def props(id:String): Props = Props(new PersistentWatch(id, Default, DefaultWatch()))
 
   def addMinute(watch: Watch): DigitalWatch = {
     val minutes = watch.minutes + 1
@@ -45,6 +38,5 @@ object PersistentWatch {
     val hour = (watch.hours + 1) % 24
     DigitalWatch(hour, watch.minutes)
   }
-
 
 }
