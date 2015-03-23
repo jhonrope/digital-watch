@@ -15,7 +15,6 @@ libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-actor" % "2.3.9" % "test",
   "org.scalatest" % "scalatest_2.11" % "2.2.4" % "test",
   "io.spray" %% "spray-testkit" % "1.3.1" % "test",
-  "com.github.michaelpisula" %% "akka-persistence-inmemory" % "0.2.1",
   "com.github.dnvriend" %% "akka-persistence-inmemory" % "1.0.0"
 )
     
