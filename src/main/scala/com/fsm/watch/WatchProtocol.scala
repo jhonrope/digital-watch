@@ -23,3 +23,8 @@ final case object Button3 extends WatchEvent
 
 final case object CurrentState extends WatchEvent
 final case object CurrentTime extends WatchEvent
+
+
+sealed trait PersistentEvent
+
+final case class ChangeState(to: WatchState) extends PersistentEvent

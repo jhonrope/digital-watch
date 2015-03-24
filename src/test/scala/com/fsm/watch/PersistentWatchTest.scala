@@ -2,8 +2,11 @@ package com.fsm.watch
 
 import akka.actor.Actor.Receive
 import akka.actor.{Actor, ActorRef, Props}
+import akka.persistence.PersistentView
 import org.scalatest.BeforeAndAfterEach
 import utils.AkkaTest
+
+case class EventRecoveredCount(count: Int)
 
 class PersistentWatchTest extends AkkaTest with BeforeAndAfterEach {
 
@@ -41,15 +44,31 @@ class PersistentWatchTest extends AkkaTest with BeforeAndAfterEach {
     }
   }
 
-  class Refresh(initialWatchState: WatchState = Default) {
+  class Refresh(persistentWatchId: String = "persistent-watch-test-id", initialWatchState: WatchState = Default) {
 
-    val pwActor = system.actorOf(Props(new PersistentWatch(initialWatchState)))
+    val pwActor = system.actorOf(Props(new PersistentWatch(persistentWatchId, initialWatchState)))
 
     def helperActor(receiveHelper: Receive)(task: => Unit): ActorRef = system.actorOf(Props(new Actor() {
       task
 
       override def receive: Receive = receiveHelper
     }))
+
+    def viewHelper(): ActorRef = system.actorOf(Props(new PersistentView {
+
+      override def viewId: String = s"$persistentWatchId-view"
+
+      override def persistenceId: String = persistentWatchId
+
+      var eventsRecovered = 0
+
+      override def receive: Actor.Receive = {
+        case e: EventRecoveredCount => sender() ! EventRecoveredCount(eventsRecovered)
+        case e => eventsRecovered += 1
+      }
+    }))
+
+
   }
 
   def cambioEstado(watchStateInitial: WatchState, watchStateDestination: WatchState, watchEvent: WatchEvent, customInitialWatchState: Boolean = false) = {
@@ -58,7 +77,7 @@ class PersistentWatchTest extends AkkaTest with BeforeAndAfterEach {
     val prueba = if (watchStateInitial === watchStateDestination) "permanecer en el estado %s con el evento %s".format(watchStateInitial, watchEvent)
     else "cambiar del estado %s al estado %s con el evento %s".format(watchStateInitial, watchStateDestination, watchEvent)
 
-    prueba in new Refresh(initialState) {
+    prueba in new Refresh(initialWatchState = initialState) {
       pwActor ! CurrentState
       expectMsg(watchStateInitial)
 
@@ -95,7 +114,7 @@ class PersistentWatchTest extends AkkaTest with BeforeAndAfterEach {
     cambioEstado(Normal, Normal, Button2, true)
 
 
-    "aumentar en 1 las horas en el estado AdjustHours con el evento Button2" in new Refresh(AdjustHours) {
+    "aumentar en 1 las horas en el estado AdjustHours con el evento Button2" in new Refresh(initialWatchState = AdjustHours) {
       pwActor ! CurrentState
       expectMsg(AdjustHours)
 
@@ -111,7 +130,7 @@ class PersistentWatchTest extends AkkaTest with BeforeAndAfterEach {
 
     }
 
-    "aumentar en 1 las horas en el estado AdjustHours con el evento Button2 y no ser mayor a 23" in new Refresh(AdjustHours) {
+    "aumentar en 1 las horas en el estado AdjustHours con el evento Button2 y no ser mayor a 23" in new Refresh(initialWatchState = AdjustHours) {
       pwActor ! CurrentState
       expectMsg(AdjustHours)
 
@@ -138,7 +157,7 @@ class PersistentWatchTest extends AkkaTest with BeforeAndAfterEach {
 
     }
 
-    "aumentar en 1 los minutos en el estado AdjustMinutes con el evento Button2" in new Refresh(AdjustMinutes) {
+    "aumentar en 1 los minutos en el estado AdjustMinutes con el evento Button2" in new Refresh(initialWatchState = AdjustMinutes) {
       pwActor ! CurrentState
       expectMsg(AdjustMinutes)
 
@@ -154,7 +173,7 @@ class PersistentWatchTest extends AkkaTest with BeforeAndAfterEach {
     }
 
 
-    "aumentar en 1 los minutos en el estado AdjustMinutes con el evento Button2 y no ser mayor de 60" in new Refresh(AdjustMinutes) {
+    "aumentar en 1 los minutos en el estado AdjustMinutes con el evento Button2 y no ser mayor de 60" in new Refresh(initialWatchState = AdjustMinutes) {
       pwActor ! CurrentState
       expectMsg(AdjustMinutes)
 
@@ -180,7 +199,7 @@ class PersistentWatchTest extends AkkaTest with BeforeAndAfterEach {
       watch2 should be(DigitalWatch(1, 0))
     }
 
-    "devolver un DigitalWatch en el estado Normal" in new Refresh() {
+    "devolver un DigitalWatch en el estado Normal" in new Refresh(persistentWatchId = "persistent-test-new-name") {
       pwActor ! CurrentState
       expectMsg(Default)
 
@@ -204,20 +223,32 @@ class PersistentWatchTest extends AkkaTest with BeforeAndAfterEach {
 
       watch should be(DigitalWatch(0, 0))
 
+      viewHelper() ! EventRecoveredCount(0)
+
+      expectMsg(EventRecoveredCount(1))
+
     }
 
+    "recuperar los eventos guardados por el persistentActor cuando cambia del estado Default a AdjustHours" in new Refresh(persistentWatchId = "persistent-test-new-name") {
+      pwActor ! CurrentState
+      expectMsg(Default)
 
-    /*cambioEstados.format(Default, AdjustHours, Button1) in new Refresh {
-
-      pwUnder.watchState should be(Default)
+      pwActor ! Button1
+      pwActor ! Button1
+      pwActor ! Button1
+      pwActor ! Button1
+      pwActor ! Button1
+      pwActor ! Button1
       pwActor ! Button1
 
-//
-//      pwUnder.watchState should be(Default)
-//      pw
-//
-//      pwActor ! Button1
+      pwActor ! CurrentState
+      expectMsg(AdjustHours)
 
-    }*/
+      viewHelper() ! EventRecoveredCount(0)
+
+      expectMsg(EventRecoveredCount(2))
+
+    }
+
   }
 }

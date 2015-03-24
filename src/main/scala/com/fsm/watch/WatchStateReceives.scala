@@ -1,11 +1,11 @@
 package com.fsm.watch
 
-import akka.actor.Actor
+import akka.persistence.PersistentActor
 
 import scala.collection.immutable.HashMap
 
 trait WatchStateReceives {
-   this: Actor =>
+   this: PersistentActor =>
 
 import PersistentWatch._
 
@@ -19,7 +19,10 @@ import PersistentWatch._
 
    def defaultReceive(pwi: PersistentWatchInfo): Receive = {
      val innerReceive: Receive = {
-       case Button1 => context.become(adjustHoursReceive(pwi.copy(watchState = AdjustHours)))
+       case Button1 => persist(ChangeState(AdjustHours)){ pe =>
+         println(s"persist $pe")
+         context.become(adjustHoursReceive(pwi.copy(watchState = pe.to)))
+       }
      }
      innerReceive orElse commonReceive(pwi)
    }
